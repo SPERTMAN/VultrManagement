@@ -1,0 +1,4 @@
+
+python VultrMan.py
+
+pause
