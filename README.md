@@ -36,7 +36,7 @@ run_vultr_list.bat
 2. 将可执行文件放到 PATH 环境变量中
 3. 配置 API 密钥：
    ```bash
-   setx VULTR_API_KEY "O447WQHVUIUVVRFOQU35N3KXFWIUTNXECLYQ" -m
+   setx VULTR_API_KEY "123456" -m
    ```
 
 ### **使用create_node.py**
