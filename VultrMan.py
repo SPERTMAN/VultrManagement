@@ -79,23 +79,9 @@ def parse_ip_pwd(output):
     """从 vultr-cli 输出中ip pwd"""
     instance_ids = []
 
-    # 按行分割输出
-    lines = output.strip().split('\n')
-
-    # 查找数据行（跳过标题行和分隔符）
-    for line in lines:
-        # 匹配UUID格式的实例ID（8-4-4-4-12格式）
-        uuid_pattern = r'^([0-9].[0-9].[0-9].[0-9].[0-9])'
-        match = re.match(uuid_pattern, line.strip())
-
-        if match:
-            instance_id = match.group(1)
-            instance_ids.append(instance_id)
-    
-    if len(instance_ids) > 0:
-        return instance_ids[0]
-    else:
-        return None
+    ip_address = re.search(r"MAIN IP\s+([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)", output)
+    password = re.search(r"PASSWORD\s+(\S+)", output)
+    return ip_address.group(1),password.group(1)
    
 def Log_info(Type):
     """
@@ -130,7 +116,9 @@ def run_vultr_instance_list(command,is_instance):
                 print(result.stdout)
                 return True
             elif is_instance==3:
-                parse_ip_pwd(result.stdout)
+                return parse_ip_pwd(result.stdout)
+            elif is_instance==4:
+                return re.search(r"POWER STATUS\s+(\S+)", result.stdout).group(1)
             else:
                 return True
 
@@ -225,7 +213,7 @@ def ssh_run(host, username, password, cmd):
     print(out)
 
     chan.close()
-    ssh.close()  
+    ssh.close()
 
 
 
@@ -299,8 +287,8 @@ def main():
     Get_instance_id_cmd = ["vultr-cli", "instance", "list"]
     Get_snapshot_id_cmd = ["vultr-cli", "snapshot", "list"]
    
-    delete_instance = ["vultr-cli", "instance", "delete"] 
-    instance_info = ["vultr-cli", "instance","get"] 
+    
+    
 
     #标题
     print_big_banner("Vultr", color="bright_magenta")
@@ -313,18 +301,18 @@ def main():
     #print(f"结合人民币 \033[1m{diff_seconds*0.01*7.18 }\033[0m 元")
     
 
-    print("连接实例...")
-    instance_para_id = run_vultr_instance_list(Get_instance_id_cmd,0)
+    #print("连接实例...")
+    
     #snapshot_para_id = run_vultr_instance_list(Get_snapshot_id_cmd,0)
 
-   # 检查实例ID
-    if instance_para_id is None:
-        delete_enable = False
-    else:
-        delete_enable = True
-        delete_instance.append(instance_para_id)
-        instance_info.append(instance_para_id)  
-    print("未找到实例ID不能使用删除" if instance_para_id is None else f"解析到的实例ID:{instance_para_id}")
+     # 检查实例ID
+    #if instance_para_id is None:
+    #    delete_enable = False
+    #else:
+    #   delete_enable = True
+     #   delete_instance.append(instance_para_id)
+     #   instance_info.append(instance_para_id)  
+    #print("未找到实例ID不能使用删除" if instance_para_id is None else f"解析到的实例ID:{instance_para_id}")
     print("-" * 50)
     # 检查快照ID
     #New_enable = False if snapshot_para_id is None else True
@@ -336,13 +324,14 @@ def main():
         print("-" * 50)
         Command = input("请输入命令（删除实例=1 新建实例=2 查看实例信息=3 建立节点=4 退出=10）：")
         if Command == "1":
-
-            if delete_enable == False:
+            
+            instance_para_id = run_vultr_instance_list(Get_instance_id_cmd,0)
+            if instance_para_id == None:
                 print("\n未找到实例ID不能使用删除")
                 return
             
             print("\n开始执行删除实例")
-            
+            delete_instance = ["vultr-cli", "instance", "delete", instance_para_id]
             if run_vultr_instance_list(delete_instance,1) :
                 LogVar.info(f"删除成功 id {instance_para_id}")
                 today_log = os.path.join("logs", datetime.now().strftime("%Y-%m-%d") + ".log")
@@ -355,9 +344,9 @@ def main():
                 print("删除失败")
        
         elif Command == "2":
-
-            if  delete_enable==True:
-                print("\n存在实例（目前存在实例不能创建）")
+            instance_para_id = run_vultr_instance_list(Get_instance_id_cmd,0)
+            if  instance_para_id!=None:
+                print(f"\n存在实例{instance_para_id}（目前存在实例不能创建）")
                 
             
             print("\n开始执行新建实例")
@@ -367,7 +356,7 @@ def main():
                             "instance", "create",
                             "--region",   Area,
                             "--plan",     Plan,
-                            "--os", os,
+                            "--os", os_id,
                             "--label",   "NewInstance",
                             "--script-id",   scriptid_id
                             ]
@@ -379,11 +368,12 @@ def main():
                 print("创建失败")
                 
         elif Command =="3":
-            if delete_enable == False:
+            instance_para_id = run_vultr_instance_list(Get_instance_id_cmd,0)
+            if instance_para_id == None:
                 print("\n未找到实例ID不能使用查看")
                 
             print("\n开始执行查看实例信息")
-            
+            instance_info = ["vultr-cli", "instance", "get",instance_para_id]
             if run_vultr_instance_list(instance_info,2) :
                 print("查看成功")
             else:
@@ -393,9 +383,29 @@ def main():
             if start == "Y" or start == "y":
                 #查询ip和密码
                 print("密码查询未有解决办法")
-                ip,pwd=run_vultr_instance_list(instance_info,3)
-                return
-                ssh_run('45.77.31.7', 'root', 'Ab]4%ihR-SNgRCNQ', 'sb')
+                instance_para_id = run_vultr_instance_list(Get_instance_id_cmd,0)
+                if instance_para_id == None:
+                    print("\n未找到实例ID不能创建节点")
+                    continue
+                ip,pwd=run_vultr_instance_list(["vultr-cli", "instance", "get",instance_para_id],3)
+
+                if pwd=='UNAVAILABLE':
+                    print("\n密码为：UNAVAILABLE，请自行去官网登录查看")
+                    #continue
+                print(f"\n解析成功，ip：{ip} 密码：{pwd}")
+                print("开始等待实例激活")
+                start_ssh=False
+                while start_ssh==False:
+                    power_status=run_vultr_instance_list(["vultr-cli", "instance", "get",instance_para_id],4)
+                    print(f"\n状态：{power_status}")
+                    if power_status=="running":
+                        print("开机完成")
+                        start_ssh=True
+                        time.sleep(3)
+
+                #return
+                ssh_run(ip, 'root', pwd, 'sb')
+                
         elif Command=="10":
             # Windows 下获取父进程（通常是 cmd.exe）
             ppid = os.getppid()

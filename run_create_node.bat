@@ -1,4 +1,4 @@
 
-python test_parse.py  45.77.31.7 "Ab]4%%ihR-SNgRCNQ"
+python create_node.py  45.77.31.7 "2r[PfXs{d+?o,ULU"
 
 pause
