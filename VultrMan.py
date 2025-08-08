@@ -238,7 +238,7 @@ def get_time_diff_between_logs(log_file_path):
     返回日志文件中两条日志的时间差（以秒为单位）。
     """
     timestamps = get_log_timestamps(log_file_path)
-    if 2 >= len(timestamps) :
+    if 2 > len(timestamps) :
         raise IndexError("日志索引超出范围")
     diff = math.ceil(abs((timestamps[len(timestamps)-1] - timestamps[len(timestamps)-2]).total_seconds())/3600)
     diff=1 if diff==0 else diff
@@ -334,6 +334,7 @@ def main():
             delete_instance = ["vultr-cli", "instance", "delete", instance_para_id]
             if run_vultr_instance_list(delete_instance,1) :
                 LogVar.info(f"删除成功 id {instance_para_id}")
+                time.sleep(2)
                 today_log = os.path.join("logs", datetime.now().strftime("%Y-%m-%d") + ".log")
                 diff_seconds = get_time_diff_between_logs(today_log)
                 print(f"具体使用时间为 \033[1m{diff_seconds}\033[0m 小时")
@@ -382,17 +383,12 @@ def main():
             start=input("是否开始执行脚本（y/n）？")
             if start == "Y" or start == "y":
                 #查询ip和密码
-                print("密码查询未有解决办法")
+                #print("密码查询未有解决办法")
                 instance_para_id = run_vultr_instance_list(Get_instance_id_cmd,0)
                 if instance_para_id == None:
                     print("\n未找到实例ID不能创建节点")
                     continue
-                ip,pwd=run_vultr_instance_list(["vultr-cli", "instance", "get",instance_para_id],3)
-
-                if pwd=='UNAVAILABLE':
-                    print("\n密码为：UNAVAILABLE，请自行去官网登录查看")
-                    #continue
-                print(f"\n解析成功，ip：{ip} 密码：{pwd}")
+                time.sleep(3)
                 print("开始等待实例激活")
                 start_ssh=False
                 while start_ssh==False:
@@ -402,7 +398,12 @@ def main():
                         print("开机完成")
                         start_ssh=True
                         time.sleep(3)
+                ip,pwd=run_vultr_instance_list(["vultr-cli", "instance", "get",instance_para_id],3)
 
+                if pwd=='UNAVAILABLE':
+                    print("\n密码为：UNAVAILABLE，请自行去官网登录查看")
+                    continue
+                print(f"\n解析成功，ip：{ip} 密码：{pwd}")
                 #return
                 ssh_run(ip, 'root', pwd, 'sb')
                 
