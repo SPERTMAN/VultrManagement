@@ -22,6 +22,7 @@ from rich.panel import Panel
 from pyfiglet import Figlet
 from rich.text import Text
 from datetime import datetime
+import sqlite3
 
 # 设置控制台编码为UTF-8，解决Windows乱码问题
 if sys.platform == "win32":
@@ -147,7 +148,7 @@ def ssh_run(host, username, password, cmd):
     
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     try:
-        ssh.connect(hostname=host, port=22,username=username, password=password, timeout=10,look_for_keys=False)
+        ssh.connect(hostname=host, port=22,username=username, password=password, timeout=20,look_for_keys=False)
     except Exception as e:
         print(f"连接失败{e}")
         return
@@ -179,41 +180,61 @@ def ssh_run(host, username, password, cmd):
     print("连接成功，自动配置ipv4 避免弹窗")
     out = send_and_wait("echo iptables-persistent iptables-persistent/autosave_v4 boolean true | sudo debconf-set-selections", pattern=r"set-selections", wait=1)
     print('-'*50)
-    print("确保 APT 非交互模式",out)
+    print("确保 APT 非交互模式")
     out = send_and_wait("sudo DEBIAN_FRONTEND=noninteractive apt-get update", pattern=r"Done", wait=1)
     print('-'*50)
-    print("安装包",out)
+    print("安装包")
     out = send_and_wait("sudo DEBIAN_FRONTEND=noninteractive apt-get -y install iptables-persistent", pattern=r"root@vultr", wait=1)
     print('-'*50)
-    print("设置成功\n",out)
+    print("设置成功\n")
     print("输入脚本链接开始创建 bash <(wget -qO- https://raw.githubusercontent.com/yonggekkk/sing-box-yg/main/sb.sh)")
-    #out = send_and_wait("bash <(wget -qO- https://raw.githubusercontent.com/yonggekkk/sing-box-yg/main/sb.sh)", pattern=r"<No>", wait=1)
-    #print(out,"\r检测到弹窗 自动确认")
-    # 模拟按下和释放回车键
-    #pyautogui.press('enter')
     
-    
-
     out = send_and_wait("bash <(wget -qO- https://raw.githubusercontent.com/yonggekkk/sing-box-yg/main/sb.sh)", pattern=r"请输入数字【0-16】", wait=1)
     print('-'*50)
-    print("创建成功，输入数字1 安装sing-box", out)
+    print("创建成功，输入数字1 安装sing-box")
     out = send_and_wait("1", pattern=r"请选择【1-2】", wait=1)
     print('-'*50)
-    print("选择防火墙，输入数字1", out)
+    print("选择防火墙，输入数字1")
     out = send_and_wait("1", pattern=r"请选择【1-2】", wait=1)
     print('-'*50)
-    print("选择内核，输入数字1", out)
+    print("选择内核，输入数字1")
     out = send_and_wait("1", pattern=r"请选择【1-2】", wait=1)
     print('-'*50)
-    print("选择自签证书，输入数字1", out)
+    print("选择自签证书，输入数字1")
     out = send_and_wait("1", pattern=r"请输入【1-2】", wait=1)
     print('-'*50)
-    print("选择协议端口，输入数字1", out)
+    print("选择协议端口，输入数字1")
     out = send_and_wait("1", pattern=r"Hysteria2/Tuic5自定义V2rayN配置、Clash-Meta/Sing-box客户端配置及私有订阅链接，请选择9查看", wait=1)
     print(out)
 
+    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    out=ansi_escape.sub('',out)
+    # 使用正则匹配 dmxlc3M6Ly9 开头的订阅链接
+    match = re.search(r"(dmxlc3M6Ly[^\s]+)", out)
+    
+    
+    if match:
+        subscription_link = match.group(1)
+        print("解析到的订阅链接：")
+        print(subscription_link)
+    else:
+        print("未找到订阅链接")
+        return
+
+    import base64
+    # 你的 Base64 字符串
+    base64_string =subscription_link
+
+    # 解码 Base64
+    decoded_bytes = base64.b64decode(base64_string)
+    decoded_string = decoded_bytes.decode('utf-8')
+
+    Sqlite_parse_link(decoded_string)
+
     chan.close()
     ssh.close()
+    time.sleep(3)
+    open_soft(r"E:\v2rayN-windows-64-desktop\v2rayN-windows-64\v2rayN.exe")
 
 
 
@@ -256,11 +277,150 @@ def print_big_banner(text="Vultr", color="cyan"):
     panel = Panel(styled_text, border_style=color, title="vultr-cli 管理工具")
     console.print(panel)
 
+def Check_other_Vpn(process_name):
+    import psutil
+    # 遍历所有进程
+    for proc in psutil.process_iter(['pid', 'name']):
+        try:
+            # 如果进程名称匹配 in：检查左边的字符串是否包含右边的字符串
+            if process_name.lower() in proc.info['name'].lower():
+                print(f"Found process {proc.info['name']} with PID {proc.info['pid']}")
+                proc.terminate()  # 尝试关闭进程
+                print(f"Process {proc.info['name']} terminated.")
+                return True
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            pass  # 忽略无效的进程
+
+    print(f"Process {process_name} not found.")
+    return False
+
+def open_soft(exe):
+    import subprocess
+
+    # 打开记事本
+    subprocess.Popen([exe])
+
+
+
+
+def Sqlite_config_del():
+   
+    conn = sqlite3.connect(sqlite_path)
+    cursor = conn.cursor()
+    # 执行查询：从sqlite_master表获取所有表的名称
+    #cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    # 输出所有表名
+    #for table in tables:
+        #print(table[0])
+    #删除之前的记录
+    cursor.execute("DELETE  FROM  ProfileItem")
+    # 提交更改
+    conn.commit()
+    # 获取查询结果
+    cursor.execute("SELECT * FROM ProfileItem")
+
+    tables = cursor.fetchall()
+    if len(tables)==0:
+        print("删除 节点配置 成功")
+
+    conn.close()
+
+def Sqlite_parse_link(url):
+    url_list=url.splitlines()
+    conn = sqlite3.connect(sqlite_path)
+    # 默认脚本id)
+    cursor = conn.cursor()
+    pattern = r"(\w+)://([\w-]+)@([\d.]+):(\d+)\?security=([^&]+)&alpn=([^&]+)&insecure=([^&]+)&sni=([^#]+)"
+
+    for url in url_list:
+        match = re.search(pattern, url)
+
+        if match:
+            proto, uuid, host, port, security, alpn, insecure, sni = match.groups()
+
+            command= f"""
+            INSERT INTO ProfileItem (
+                                        MuxEnabled,
+                                        Extra,
+                                        Mldsa65Verify,
+                                        SpiderX,
+                                        ShortId,
+                                        PublicKey,
+                                        DisplayLog,
+                                        Fingerprint,
+                                        PreSocksPort,
+                                        CoreType,
+                                        Alpn,
+                                        Sni,
+                                        Flow,
+                                        IsSub,
+                                        Subid,
+                                        AllowInsecure,
+                                        StreamSecurity,
+                                        Path,
+                                        RequestHost,
+                                        HeaderType,
+                                        Remarks,
+                                        Network,
+                                        Security,
+                                        AlterId,
+                                        Id,
+                                        Ports,
+                                        Port,
+                                        Address,
+                                        ConfigVersion,
+                                        ConfigType,
+                                        IndexId
+                                    )
+                                    VALUES (
+                                        NULL,
+                                        NULL,
+                                        '',
+                                        '',
+                                        '',
+                                        '',
+                                        1,
+                                        '',
+                                        NULL,
+                                        24,
+                                        'h3',
+                                        '{sni}',
+                                        '',
+                                        0,
+                                        NULL,
+                                        'true',
+                                        '{security}',
+                                        '',
+                                        '',
+                                        'none',
+                                        'hy2-vultr',
+                                        '',
+                                        '',
+                                        0,
+                                        '{uuid}',
+                                        '',
+                                        {port},
+                                        '{host}',
+                                        2,
+                                        7,
+                                        1
+                                    );
+
+            """
+
+            cursor.execute(command)
+            conn.commit()
+
+            cursor.execute("SELECT * FROM ProfileItem")
+            print("加入成功")
+    conn.close()
+
 
 
 
 def main():
     """主函数"""
+    global sqlite_path
     instance_para_id = ""
     snapshot_para_id = ""
     
@@ -278,6 +438,8 @@ def main():
 
     # 默认os
     os_id = "2136"
+    #db path
+    sqlite_path=r"E:\v2rayN-windows-64-desktop\v2rayN-windows-64\guiConfigs\guiNDB.db"
     # 默认脚本id
     scriptid_id="75e09113-bc1e-4d0d-902c-92ca164f8c34"
     ip_address=""
@@ -295,6 +457,12 @@ def main():
 
     #加载日志
     LogVar=Logs()
+
+    #关闭连接影响的相关软件
+    Check_other_Vpn("v2rayN.exe")
+    Check_other_Vpn("clash-verge.exe")
+
+    
     #diff_seconds=2
     #print(f"具体使用时间为 \033[1m{diff_seconds}\033[0m 小时")
     #print(f"预计费用 \033[1m{diff_seconds*0.01 }\033[0m 美元")
@@ -380,6 +548,7 @@ def main():
             else:
                 print("查看失败")
         elif Command=="4":
+            Sqlite_config_del()
             start=input("是否开始执行脚本（y/n）？")
             if start == "Y" or start == "y":
                 #查询ip和密码
@@ -388,24 +557,29 @@ def main():
                 if instance_para_id == None:
                     print("\n未找到实例ID不能创建节点")
                     continue
-                time.sleep(3)
+                time.sleep(10)
                 print("开始等待实例激活")
                 start_ssh=False
                 while start_ssh==False:
+                    time.sleep(2) 
                     power_status=run_vultr_instance_list(["vultr-cli", "instance", "get",instance_para_id],4)
                     print(f"\n状态：{power_status}")
                     if power_status=="running":
                         print("开机完成")
                         start_ssh=True
-                        time.sleep(3)
+                        time.sleep(5)
                 ip,pwd=run_vultr_instance_list(["vultr-cli", "instance", "get",instance_para_id],3)
 
                 if pwd=='UNAVAILABLE':
                     print("\n密码为：UNAVAILABLE，请自行去官网登录查看")
-                    continue
+                    pwd=input("手动查看密码（取消 ：n）")
+                    if pwd=="n"or pwd=="N":
+                        continue
                 print(f"\n解析成功，ip：{ip} 密码：{pwd}")
                 #return
+                time.sleep(5)
                 ssh_run(ip, 'root', pwd, 'sb')
+                
                 
         elif Command=="10":
             # Windows 下获取父进程（通常是 cmd.exe）
